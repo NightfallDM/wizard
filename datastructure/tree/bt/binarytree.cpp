@@ -5,10 +5,11 @@ const int sq_capacity = 100;
 template<class Tp>
 class Squeue {
     Tp sq_array[sq_capacity];
-    unsigned int cursor;
+    unsigned int head_cursor;
+    unsigned int tail_cursor;
     unsigned int len;
     public:
-        Squeue(): cursor(0), len(0){}
+        Squeue(): head_cursor(0), tail_cursor(0), len(0){}
         unsigned int length() {
             return len;
         }
@@ -16,10 +17,10 @@ class Squeue {
         // -1 represent err: sq full;
         int in(Tp val) {
             if (len < sq_capacity){
-                sq_array[cursor] = val;
+                sq_array[tail_cursor] = val;
                 len++;
-                if (++cursor == 100){
-                    cursor = 0;
+                if (++tail_cursor == 100){
+                    tail_cursor = 0;
                 }
                 return 0;
             }
@@ -31,11 +32,12 @@ class Squeue {
                 return NULL;
             }
             len--;
-            if (--cursor == -1) {
-                cursor = sq_capacity - 1;
-                return sq_array[0];
+            if (++head_cursor == sq_capacity) {
+                head_cursor = 0;
+                return sq_array[sq_capacity - 1];
+            }else {
+                return sq_array[head_cursor - 1];
             }
-            return sq_array[cursor + 1];
         }
 
         bool empty() {
