@@ -30,8 +30,30 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         }
         println!("key = {}, value = {}", self.key, self.value);
         contain.push(unsafe{
-            NonNull::new_unchecked(&self as *const _ as *mut _)
+            NonNull::new_unchecked(self as *const _ as *mut _)
         });
+        if let Some(nnptr) = self.right {
+            unsafe {
+                nnptr.as_ref().traverse(contain);
+            }
+        }
+    }
+
+    pub fn traverse_key(&self, key: &K, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
+        if let Some(nnptr) = self.left {
+            unsafe {
+                nnptr.as_ref().traverse(contain);
+            }
+        }
+        println!("key = {}, value = {}", self.key, self.value);
+        contain.push(unsafe{
+            NonNull::new_unchecked(self as *const _ as *mut _)
+        });
+
+        if self.key == *key {
+            return;
+        }
+
         if let Some(nnptr) = self.right {
             unsafe {
                 nnptr.as_ref().traverse(contain);
@@ -156,8 +178,10 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
 
     // ret the nnptr point to the real BstNode
     pub fn delete(&mut self, key: &K) -> Option<NonNull<BstNode<T, K>>> {
+        let mut search_contain = Vec::with_capacity(16);
         let mut contain = Vec::with_capacity(16);
-        if let Some(del_nnptr) = self.search(key, &mut contain) {
+        if let Some(del_nnptr) = self.search(key, &mut search_contain) {
+            unsafe{self.root.unwrap().as_ref()}.traverse_key(key, &mut contain);
             let mut idx = 0;
             let length = contain.len();
             let contain_clone = contain.clone();
@@ -170,7 +194,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
                 idx += 1;
             }
             println!("{}", idx);
-            Some(contain[contain.len() - idx - 1])
+            Some(contain[length - idx - 1])
             // Some(contain[contain.len() - 2])
         }else {
             None
