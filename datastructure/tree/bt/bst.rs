@@ -10,8 +10,16 @@ struct BstNode<T: Display + Copy, K: PartialOrd + Display + Copy> {
 }
 
 impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
-    pub fn new(val: T, key: K) -> Self {
+    fn new(val: T, key: K) -> Self {
         BstNode {value: val, key: key, left: None, right: None}
+    }
+
+    fn new_box(val: T, key: K) -> Box<Self> {
+        Box::new(BstNode::new(val, key))
+    }
+
+    fn new_box_leak<'a>(val: T, key: K) -> &'a mut Self {
+        Box::leak(Self::new_box(val, key))
     }
 
     pub fn get_val(&self) -> &T {
@@ -97,6 +105,20 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         self.key = *key;
     }
 
+    pub fn insert(&mut self, val: T, key: K) {
+        if key < self.key {
+            match self.left {
+                None => self.left = Some(BstNode::new_box_leak(val, key).into()),
+                Some(mut next_nnptr) => unsafe{next_nnptr.as_mut()}.insert(val, key),
+            }
+        }else {
+            match self.right {
+                None => self.right = Some(BstNode::new_box_leak(val, key).into()),
+                Some(mut next_nnptr) => unsafe{next_nnptr.as_mut()}.insert(val, key),
+            }
+        }
+    }
+
 }
 
 
@@ -120,30 +142,33 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         }
     }
 
-    pub fn insert(&mut self, ins_node: &mut BstNode<T, K>) {
+    pub fn insert(&mut self, val: T, key: K) {
         match self.root {
-            None => self.root = Some(unsafe{NonNull::new_unchecked(ins_node as *mut _)}),
-
+            None => self.root = Some(BstNode::new_box_leak(val, key).into()),
             Some(mut root_node_nnptr) => {
-                unsafe{
-                    if root_node_nnptr.as_ref().get_key() > ins_node.get_key() {
-                        match root_node_nnptr.as_ref().get_left() {
-                            None => root_node_nnptr.as_mut().set_left(ins_node),
-                            Some(next_node) => {
-                                Bst {root: Some(next_node)}.insert(ins_node);
-                            },
-                        }
-                    }else {
-                        match root_node_nnptr.as_ref().get_right() {
-                            None => root_node_nnptr.as_mut().set_right(ins_node),
-                            Some(next_node) => {
-                                // next_node.as_mut().insert(ins_node);
-                                Bst {root: Some(next_node)}.insert(ins_node);
-                            },
-                        }
-                    }
-                }
-            }
+                unsafe {root_node_nnptr.as_mut()}.insert(val, key);
+            },
+
+            // Some(mut root_node_nnptr) => {
+            //     unsafe{
+            //         if root_node_nnptr.as_ref().get_key() > ins_node.get_key() {
+            //             match root_node_nnptr.as_ref().get_left() {
+            //                 None => root_node_nnptr.as_mut().set_left(ins_node),
+            //                 Some(next_node) => {
+            //                     Bst {root: Some(next_node)}.insert(ins_node);
+            //                 },
+            //             }
+            //         }else {
+            //             match root_node_nnptr.as_ref().get_right() {
+            //                 None => root_node_nnptr.as_mut().set_right(ins_node),
+            //                 Some(next_node) => {
+            //                     // next_node.as_mut().insert(ins_node);
+            //                     Bst {root: Some(next_node)}.insert(ins_node);
+            //                 },
+            //             }
+            //         }
+            //     }
+            // }
 
         }
     }
@@ -204,20 +229,34 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
 }
 
 fn main() {
-    let mut node1 = BstNode::new(6, 6);
-    let mut bs = Bst::new_with_node(&mut node1);
-    let mut node2 = BstNode::new(12, 12);
-    bs.insert(&mut node2);
-    let mut node3 = BstNode::new(3, 3);
-    bs.insert(&mut node3);
-    let mut node4 = BstNode::new(1, 1);
-    let mut node5 = BstNode::new(5, 5);
-    let mut node6 = BstNode::new(10, 10);
-    let mut node7 = BstNode::new(14, 14);
-    bs.insert(&mut node4);
-    bs.insert(&mut node5);
-    bs.insert(&mut node6);
-    bs.insert(&mut node7);
+    // let mut node1 = BstNode::new(6, 6);
+    // let mut bs = Bst::new_with_node(&mut node1);
+    // let mut node2 = BstNode::new(12, 12);
+    // bs.insert(&mut node2);
+    // let mut node3 = BstNode::new(3, 3);
+    // bs.insert(&mut node3);
+    // let mut node4 = BstNode::new(1, 1);
+    // let mut node5 = BstNode::new(5, 5);
+    // let mut node6 = BstNode::new(10, 10);
+    // let mut node7 = BstNode::new(14, 14);
+    // bs.insert(&mut node4);
+    // bs.insert(&mut node5);
+    // bs.insert(&mut node6);
+    // bs.insert(&mut node7);
+    // let mut contain = Vec::with_capacity(16);
+    // bs.traverse(&mut contain);
+    // println!("{:?}", contain);
+    // bs.delete(&6);
+    // bs.traverse(&mut contain);
+    // println!("{:?}", contain);
+
+    let mut bs = Bst::new();
+    bs.insert(6, 6);
+    bs.insert(12, 12);
+    bs.insert(3, 3);
+    bs.insert(1, 1);
+    bs.insert(10, 10);
+    bs.insert(14, 14);
     let mut contain = Vec::with_capacity(16);
     bs.traverse(&mut contain);
     println!("{:?}", contain);
