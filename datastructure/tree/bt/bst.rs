@@ -119,6 +119,40 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         }
     }
 
+    pub fn min(&self) -> NonNull<Self> {
+        if let Some(next_ndnnptr) = self.left {
+            unsafe{next_ndnnptr.as_ref()}.min()
+        }else {
+            unsafe{NonNull::new_unchecked(self as *const _ as *mut _)}
+        }
+    }
+
+    pub fn max(&self) -> NonNull<Self> {
+        if let Some(next_ndnnptr) = self.right {
+            unsafe{next_ndnnptr.as_ref()}.max()
+        }else {
+            unsafe{NonNull::new_unchecked(self as *const _ as *mut _)}
+        }
+    }
+
+    pub fn search(&self, key: &K) -> Option<NonNull<Self>> {
+        if *key == self.key {
+            return Some(unsafe{NonNull::new_unchecked(self as *const _ as *mut _)});
+        }
+
+        if *key < self.key {
+            match self.left {
+                None => return None,
+                Some(next_nnptr) => unsafe{next_nnptr.as_ref()}.search(key),
+            }
+        }else {
+            match self.right {
+                None => None,
+                Some(next_nnptr) => unsafe{next_nnptr.as_ref()}.search(key),
+            }
+        }
+    }
+
 }
 
 
@@ -148,32 +182,10 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
             Some(mut root_node_nnptr) => {
                 unsafe {root_node_nnptr.as_mut()}.insert(val, key);
             },
-
-            // Some(mut root_node_nnptr) => {
-            //     unsafe{
-            //         if root_node_nnptr.as_ref().get_key() > ins_node.get_key() {
-            //             match root_node_nnptr.as_ref().get_left() {
-            //                 None => root_node_nnptr.as_mut().set_left(ins_node),
-            //                 Some(next_node) => {
-            //                     Bst {root: Some(next_node)}.insert(ins_node);
-            //                 },
-            //             }
-            //         }else {
-            //             match root_node_nnptr.as_ref().get_right() {
-            //                 None => root_node_nnptr.as_mut().set_right(ins_node),
-            //                 Some(next_node) => {
-            //                     // next_node.as_mut().insert(ins_node);
-            //                     Bst {root: Some(next_node)}.insert(ins_node);
-            //                 },
-            //             }
-            //         }
-            //     }
-            // }
-
         }
     }
 
-    pub fn search(&self, key: &K, contain: &mut Vec<NonNull<BstNode<T, K>>>) -> Option<NonNull<BstNode<T, K>>> {
+    pub fn search_with_vec(&self, key: &K, contain: &mut Vec<NonNull<BstNode<T, K>>>) -> Option<NonNull<BstNode<T, K>>> {
         match self.root {
             None => return None,
             Some(node_nnptr) => {
@@ -185,14 +197,14 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
                         match unsafe{node_nnptr.as_ref().get_left()} {
                             None => return None,
                             Some(next_nnptr) => {
-                                Bst {root: Some(next_nnptr)}.search(key, contain)
+                                Bst {root: Some(next_nnptr)}.search_with_vec(key, contain)
                             },
                         }
                     }else {
                         match unsafe{node_nnptr.as_ref().get_right()} {
                             None => return None,
                             Some(next_nnptr) => {
-                                Bst {root: Some(next_nnptr)}.search(key, contain)
+                                Bst {root: Some(next_nnptr)}.search_with_vec(key, contain)
                             },
                         }
                     }
@@ -201,11 +213,67 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         }
     }
 
+    pub fn search(&self, key: &K) -> Option<NonNull<BstNode<T, K>>> {
+        match self.root {
+            None => None,
+            Some(node_nnptr) => {
+                unsafe{node_nnptr.as_ref()}.search(key)
+            }
+        }
+    }
+
+
+    fn _delete_min(node_nnptr: &mut NonNull<BstNode<T, K>>) -> Option<NonNull<BstNode<T, K>>> {
+        // match unsafe{node_nnptr.as_ref()}.left {
+        //     None => {
+        //         let ret_node = unsafe{node_nnptr.as_ref()}.right;
+        //         {
+        //             unsafe{Box::from_raw(node_nnptr.as_ptr());}
+        //         }
+        //         ret_node
+        //     },
+        //     Some(mut next_node_nnptr) => {
+        //         Bst::_delete_min(&mut next_node_nnptr)
+        //     },
+        // }
+        if let None = unsafe{node_nnptr.as_ref()}.left {
+            let ret_node = unsafe{node_nnptr.as_ref()}.right;
+            {
+                // free this node
+                unsafe{Box::from_raw(node_nnptr.as_ptr());}
+            }
+            return ret_node;
+        }
+
+        unsafe{node_nnptr.as_mut()}.left = Bst::_delete_min(&mut unsafe{node_nnptr.as_mut()}.left.unwrap());
+        Some(*node_nnptr)
+
+    }
+
+    pub fn delete_min(&mut self) {
+        if let Some(mut node_nnptr) = self.root {
+            self.root = Bst::_delete_min(&mut node_nnptr);
+        }
+    }
+
+    fn _min(node_nnptr: NonNull<BstNode<T, K>>) -> NonNull<BstNode<T, K>> {
+        unsafe{node_nnptr.as_ref()}.min()
+    }
+
+    pub fn min(&self) -> Option<NonNull<BstNode<T, K>>> {
+        match self.root {
+            None => None,
+            Some(node_nnptr) => {
+                Some(Bst::_min(node_nnptr))
+            },
+        }
+    }
+
     // ret the nnptr point to the real BstNode
-    pub fn delete(&mut self, key: &K) -> Option<NonNull<BstNode<T, K>>> {
+    pub fn delete_wrong(&mut self, key: &K) {
         let mut search_contain = Vec::with_capacity(16);
         let mut contain = Vec::with_capacity(16);
-        if let Some(del_nnptr) = self.search(key, &mut search_contain) {
+        if let Some(del_nnptr) = self.search_with_vec(key, &mut search_contain) {
             unsafe{self.root.unwrap().as_ref()}.traverse_key(key, &mut contain);
             let mut idx = 0;
             let length = contain.len();
@@ -219,11 +287,43 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
                 idx += 1;
             }
             println!("{}", idx);
-            Some(contain[length - idx - 1])
-            // Some(contain[contain.len() - 2])
-        }else {
-            None
+            unsafe{contain[length - idx].as_mut()}.right = None;
+            unsafe{
+                {
+                    Box::from_raw(contain.remove(length - idx - 1).as_ptr());
+                }
+            }
         }
+    }
+
+    fn _delete(mut node_nnptr_opt: Option<NonNull<BstNode<T, K>>>, key: &K) -> Option<NonNull<BstNode<T, K>>> {
+        if let None = node_nnptr_opt {
+            return None;
+        }
+
+        if unsafe{node_nnptr_opt.unwrap().as_ref()}.key > *key {
+            Bst::_delete(unsafe{node_nnptr_opt.unwrap().as_ref()}.left, key)
+        }else if unsafe{node_nnptr_opt.unwrap().as_ref()}.key < *key {
+            Bst::_delete(unsafe{node_nnptr_opt.unwrap().as_ref()}.right, key)
+        }else {
+            if let None = unsafe{node_nnptr_opt.unwrap().as_ref()}.left {
+                return unsafe{node_nnptr_opt.unwrap().as_ref()}.right;
+            }
+
+            if let None = unsafe{node_nnptr_opt.unwrap().as_ref()}.right {
+                return unsafe{node_nnptr_opt.unwrap().as_ref()}.left;
+            }
+            
+            let del_after_min_nnptr = Bst::_min(unsafe{node_nnptr_opt.unwrap().as_ref()}.right.unwrap());
+            unsafe{node_nnptr_opt.unwrap().as_mut()}.key = unsafe{del_after_min_nnptr.as_ref()}.key;
+            unsafe{node_nnptr_opt.unwrap().as_mut()}.value = unsafe{del_after_min_nnptr.as_ref()}.value;
+            unsafe{node_nnptr_opt.unwrap().as_mut()}.right = Bst::_delete_min(&mut unsafe{node_nnptr_opt.unwrap().as_mut()}.right.unwrap());
+            node_nnptr_opt
+        }
+    }
+
+    pub fn delete(&mut self, key: &K) {
+        self.root = Bst::_delete(self.root, key);
     }
 
 }
@@ -255,8 +355,11 @@ fn main() {
     bs.insert(12, 12);
     bs.insert(3, 3);
     bs.insert(1, 1);
+    bs.insert(5, 5);
     bs.insert(10, 10);
     bs.insert(14, 14);
+    bs.delete_min();
+    bs.delete_min();
     let mut contain = Vec::with_capacity(16);
     bs.traverse(&mut contain);
     println!("{:?}", contain);
