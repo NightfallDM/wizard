@@ -30,10 +30,10 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         &self.key
     }
 
-    pub fn traverse(&self, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
+    pub fn traverse_with_vec(&self, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
         if let Some(nnptr) = self.left {
             unsafe {
-                nnptr.as_ref().traverse(contain);
+                nnptr.as_ref().traverse_with_vec(contain);
             }
         }
         println!("key = {}, value = {}", self.key, self.value);
@@ -42,30 +42,18 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         });
         if let Some(nnptr) = self.right {
             unsafe {
-                nnptr.as_ref().traverse(contain);
+                nnptr.as_ref().traverse_with_vec(contain);
             }
         }
     }
 
-    pub fn traverse_key(&self, key: &K, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
-        if let Some(nnptr) = self.left {
-            unsafe {
-                nnptr.as_ref().traverse(contain);
-            }
+    pub fn traverse(&self) {
+        if let Some(left_nnptr) = self.left {
+            unsafe{left_nnptr.as_ref()}.traverse();
         }
         println!("key = {}, value = {}", self.key, self.value);
-        contain.push(unsafe{
-            NonNull::new_unchecked(self as *const _ as *mut _)
-        });
-
-        if self.key == *key {
-            return;
-        }
-
-        if let Some(nnptr) = self.right {
-            unsafe {
-                nnptr.as_ref().traverse(contain);
-            }
+        if let Some(right_nnptr) = self.right {
+            unsafe{right_nnptr.as_ref()}.traverse();
         }
     }
 
@@ -169,10 +157,19 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         Bst {root: NonNull::new(root_node as *const _ as *mut _)}
     }
 
-    pub fn traverse(&self, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
+    pub fn traverse_with_vec(&self, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
         match self.root {
             None => return,
-            Some(nnptr) => unsafe {nnptr.as_ref().traverse(contain);},
+            Some(nnptr) => unsafe {nnptr.as_ref().traverse_with_vec(contain);},
+        }
+    }
+
+    pub fn traverse(&self) {
+        match self.root {
+            None => {},
+            Some(node_nnptr) => {
+                unsafe{node_nnptr.as_ref()}.traverse();
+            },
         }
     }
 
@@ -269,33 +266,6 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         }
     }
 
-    // ret the nnptr point to the real BstNode
-    pub fn delete_wrong(&mut self, key: &K) {
-        let mut search_contain = Vec::with_capacity(16);
-        let mut contain = Vec::with_capacity(16);
-        if let Some(del_nnptr) = self.search_with_vec(key, &mut search_contain) {
-            unsafe{self.root.unwrap().as_ref()}.traverse_key(key, &mut contain);
-            let mut idx = 0;
-            let length = contain.len();
-            let contain_clone = contain.clone();
-            for elem in contain_clone.iter().rev() {
-                if unsafe{elem.as_ref()}.get_right() == None && unsafe{elem.as_ref()}.get_left() == None {
-                    unsafe{contain[length - 1].as_mut()}.set_val_key(unsafe{elem.as_ref()}.get_val(), unsafe{elem.as_ref()}.get_key());
-                    break;
-                    // return Some(*elem);
-                }
-                idx += 1;
-            }
-            println!("{}", idx);
-            unsafe{contain[length - idx].as_mut()}.right = None;
-            unsafe{
-                {
-                    Box::from_raw(contain.remove(length - idx - 1).as_ptr());
-                }
-            }
-        }
-    }
-
     fn _delete(mut node_nnptr_opt: Option<NonNull<BstNode<T, K>>>, key: &K) -> Option<NonNull<BstNode<T, K>>> {
         if let None = node_nnptr_opt {
             return None;
@@ -360,10 +330,8 @@ fn main() {
     bs.insert(14, 14);
     bs.delete_min();
     bs.delete_min();
-    let mut contain = Vec::with_capacity(16);
-    bs.traverse(&mut contain);
-    println!("{:?}", contain);
+    bs.traverse();
+    println!("first traverse");
     bs.delete(&6);
-    bs.traverse(&mut contain);
-    println!("{:?}", contain);
+    bs.traverse();
 }
