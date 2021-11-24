@@ -22,6 +22,14 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         Box::leak(Self::new_box(val, key))
     }
 
+    fn nn_to_node_ref<'a>(node_nnptr: NonNull<BstNode<T, K>>) -> &'a Self {
+        unsafe{node_nnptr.as_ref()}
+    }
+
+    fn nn_to_node_mut<'a>(mut node_nnptr: NonNull<Self>) -> &'a mut Self {
+        unsafe{node_nnptr.as_mut()}
+    }
+
     pub fn get_val(&self) -> &T {
         &self.value
     }
@@ -49,11 +57,11 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
 
     pub fn traverse(&self) {
         if let Some(left_nnptr) = self.left {
-            unsafe{left_nnptr.as_ref()}.traverse();
+            BstNode::nn_to_node_ref(left_nnptr).traverse();
         }
         println!("key = {}, value = {}", self.key, self.value);
         if let Some(right_nnptr) = self.right {
-            unsafe{right_nnptr.as_ref()}.traverse();
+            BstNode::nn_to_node_ref(right_nnptr).traverse();
         }
     }
 
@@ -97,19 +105,19 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         if key < self.key {
             match self.left {
                 None => self.left = Some(BstNode::new_box_leak(val, key).into()),
-                Some(mut next_nnptr) => unsafe{next_nnptr.as_mut()}.insert(val, key),
+                Some(mut next_nnptr) => BstNode::nn_to_node_mut(next_nnptr).insert(val, key),
             }
         }else {
             match self.right {
                 None => self.right = Some(BstNode::new_box_leak(val, key).into()),
-                Some(mut next_nnptr) => unsafe{next_nnptr.as_mut()}.insert(val, key),
+                Some(mut next_nnptr) => BstNode::nn_to_node_mut(next_nnptr).insert(val, key),
             }
         }
     }
 
     pub fn min(&self) -> NonNull<Self> {
         if let Some(next_ndnnptr) = self.left {
-            unsafe{next_ndnnptr.as_ref()}.min()
+            BstNode::nn_to_node_ref(next_ndnnptr).min()
         }else {
             unsafe{NonNull::new_unchecked(self as *const _ as *mut _)}
         }
@@ -117,7 +125,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
 
     pub fn max(&self) -> NonNull<Self> {
         if let Some(next_ndnnptr) = self.right {
-            unsafe{next_ndnnptr.as_ref()}.max()
+            BstNode::nn_to_node_ref(next_ndnnptr).max()
         }else {
             unsafe{NonNull::new_unchecked(self as *const _ as *mut _)}
         }
@@ -131,12 +139,12 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> BstNode<T, K> {
         if *key < self.key {
             match self.left {
                 None => return None,
-                Some(next_nnptr) => unsafe{next_nnptr.as_ref()}.search(key),
+                Some(next_nnptr) => BstNode::nn_to_node_ref(next_nnptr).search(key),
             }
         }else {
             match self.right {
                 None => None,
-                Some(next_nnptr) => unsafe{next_nnptr.as_ref()}.search(key),
+                Some(next_nnptr) => BstNode::nn_to_node_ref(next_nnptr).search(key),
             }
         }
     }
@@ -160,7 +168,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
     pub fn traverse_with_vec(&self, contain: &mut Vec<NonNull<BstNode<T, K>>>) {
         match self.root {
             None => return,
-            Some(nnptr) => unsafe {nnptr.as_ref().traverse_with_vec(contain);},
+            Some(nnptr) => {BstNode::nn_to_node_ref(nnptr).traverse_with_vec(contain);},
         }
     }
 
@@ -168,7 +176,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         match self.root {
             None => {},
             Some(node_nnptr) => {
-                unsafe{node_nnptr.as_ref()}.traverse();
+                BstNode::nn_to_node_ref(node_nnptr).traverse();
             },
         }
     }
@@ -177,7 +185,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         match self.root {
             None => self.root = Some(BstNode::new_box_leak(val, key).into()),
             Some(mut root_node_nnptr) => {
-                unsafe {root_node_nnptr.as_mut()}.insert(val, key);
+                BstNode::nn_to_node_mut(root_node_nnptr).insert(val, key);
             },
         }
     }
@@ -187,18 +195,18 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
             None => return None,
             Some(node_nnptr) => {
                 contain.push(node_nnptr);
-                if unsafe{node_nnptr.as_ref().get_key()} == key {
+                if BstNode::nn_to_node_ref(node_nnptr).key == *key {
                     return Some(node_nnptr);
                 }else {
-                    if unsafe{node_nnptr.as_ref().get_key()} > key {
-                        match unsafe{node_nnptr.as_ref().get_left()} {
+                    if BstNode::nn_to_node_ref(node_nnptr).key > *key {
+                        match BstNode::nn_to_node_ref(node_nnptr).get_left() {
                             None => return None,
                             Some(next_nnptr) => {
                                 Bst {root: Some(next_nnptr)}.search_with_vec(key, contain)
                             },
                         }
                     }else {
-                        match unsafe{node_nnptr.as_ref().get_right()} {
+                        match BstNode::nn_to_node_ref(node_nnptr).get_right() {
                             None => return None,
                             Some(next_nnptr) => {
                                 Bst {root: Some(next_nnptr)}.search_with_vec(key, contain)
@@ -214,7 +222,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         match self.root {
             None => None,
             Some(node_nnptr) => {
-                unsafe{node_nnptr.as_ref()}.search(key)
+                BstNode::nn_to_node_ref(node_nnptr).search(key)
             }
         }
     }
@@ -233,8 +241,8 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
         //         Bst::_delete_min(&mut next_node_nnptr)
         //     },
         // }
-        if let None = unsafe{node_nnptr.as_ref()}.left {
-            let ret_node = unsafe{node_nnptr.as_ref()}.right;
+        if let None = BstNode::nn_to_node_ref(*node_nnptr).left {
+            let ret_node = BstNode::nn_to_node_ref(*node_nnptr).right;
             {
                 // free this node
                 unsafe{Box::from_raw(node_nnptr.as_ptr());}
@@ -242,7 +250,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
             return ret_node;
         }
 
-        unsafe{node_nnptr.as_mut()}.left = Bst::_delete_min(&mut unsafe{node_nnptr.as_mut()}.left.unwrap());
+        BstNode::nn_to_node_mut(*node_nnptr).left = Bst::_delete_min(&mut BstNode::nn_to_node_mut(*node_nnptr).left.unwrap());
         Some(*node_nnptr)
 
     }
@@ -254,7 +262,7 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
     }
 
     fn _min(node_nnptr: NonNull<BstNode<T, K>>) -> NonNull<BstNode<T, K>> {
-        unsafe{node_nnptr.as_ref()}.min()
+        BstNode::nn_to_node_ref(node_nnptr).min()
     }
 
     pub fn min(&self) -> Option<NonNull<BstNode<T, K>>> {
@@ -271,23 +279,23 @@ impl<T: Display + Copy, K: PartialOrd + Display + Copy> Bst<T, K> {
             return None;
         }
 
-        if unsafe{node_nnptr_opt.unwrap().as_ref()}.key > *key {
-            Bst::_delete(unsafe{node_nnptr_opt.unwrap().as_ref()}.left, key)
-        }else if unsafe{node_nnptr_opt.unwrap().as_ref()}.key < *key {
-            Bst::_delete(unsafe{node_nnptr_opt.unwrap().as_ref()}.right, key)
+        if BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).key > *key {
+            Bst::_delete(BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).left, key)
+        }else if BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).key < *key {
+            Bst::_delete(BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).right, key)
         }else {
-            if let None = unsafe{node_nnptr_opt.unwrap().as_ref()}.left {
-                return unsafe{node_nnptr_opt.unwrap().as_ref()}.right;
+            if let None = BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).left {
+                return BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).right;
             }
 
-            if let None = unsafe{node_nnptr_opt.unwrap().as_ref()}.right {
-                return unsafe{node_nnptr_opt.unwrap().as_ref()}.left;
+            if let None = BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).right {
+                return BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).left;
             }
             
-            let del_after_min_nnptr = Bst::_min(unsafe{node_nnptr_opt.unwrap().as_ref()}.right.unwrap());
-            unsafe{node_nnptr_opt.unwrap().as_mut()}.key = unsafe{del_after_min_nnptr.as_ref()}.key;
-            unsafe{node_nnptr_opt.unwrap().as_mut()}.value = unsafe{del_after_min_nnptr.as_ref()}.value;
-            unsafe{node_nnptr_opt.unwrap().as_mut()}.right = Bst::_delete_min(&mut unsafe{node_nnptr_opt.unwrap().as_mut()}.right.unwrap());
+            let del_after_min_nnptr = Bst::_min(BstNode::nn_to_node_ref(node_nnptr_opt.unwrap()).right.unwrap());
+            BstNode::nn_to_node_mut(node_nnptr_opt.unwrap()).key = BstNode::nn_to_node_ref(del_after_min_nnptr).key;
+            BstNode::nn_to_node_mut(node_nnptr_opt.unwrap()).value = BstNode::nn_to_node_ref(del_after_min_nnptr).value;
+            BstNode::nn_to_node_mut(node_nnptr_opt.unwrap()).right = Bst::_delete_min(&mut BstNode::nn_to_node_mut(node_nnptr_opt.unwrap()).right.unwrap());
             node_nnptr_opt
         }
     }
