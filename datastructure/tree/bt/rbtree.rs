@@ -6,16 +6,22 @@ enum Color {
     Black,
 }
 
-struct RbNode<T, K> 
-    where T: Display,
-          K: PartialOrd,
+struct RbNode<K, V> 
+    where K: PartialOrd,
+          V: Display,
 {
-    value: T,
     key: K,
+    value: V,
     color: Color,
     node_count: usize,
-    left: NonNull<Self>,
-    right: NonNull<Self>,
+    left: Option<NonNull<Self>>,
+    right: Option<NonNull<Self>>,
+}
+
+impl<K: PartialOrd, V: Display> RbNode<K, V> {
+    fn new(key: K, value: V, color: Color) -> Self {
+        RbNode {key, vaule, color, node_count: 0, left: None, right: None}
+    }
 }
 
 fn main() {
