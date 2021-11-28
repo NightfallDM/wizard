@@ -139,6 +139,71 @@ impl<K: PartialOrd, V: Display> RbTree<K, V> {
         self.root = Some(Self::_put(self.root, key, value));
         RbNode::nn_to_mut(self.root.unwrap()).color = Color::Red;
     }
+
+    // use in delete
+    fn flip_color_delete(mut node_nnptr: NonNull<RbNode<K, V>>) {
+        let curr = RbNode::nn_to_mut(node_nnptr);
+        curr.color = Color::Black;
+        RbNode::nn_to_mut(curr.left.unwrap()).color = Color::Red;
+        RbNode::nn_to_mut(curr.right.unwrap()).color = Color::Red;
+    }
+
+    // input Node and make node.left not be the 2 node.
+    fn move_red_left(mut node_nnptr: NonNull<RbNode<K, V>>) -> NonNull<RbNode<K, V>> {
+        RbTree::flip_color_delete(node_nnptr);
+        if RbNode::is_red(RbNode::nn_to_ref(RbNode::nn_to_ref(node_nnptr).right.unwrap()).left) {
+            RbNode::nn_to_mut(node_nnptr).right = Some(RbTree::_totate_right(RbNode::nn_to_mut(node_nnptr).right.unwrap()));
+            node_nnptr = RbTree::_totate_left(node_nnptr);
+        }
+        node_nnptr
+    }
+
+    fn blance(mut node_nnptr: NonNull<RbNode<K, V>>) -> NonNull<RbNode<K, V>>{
+        let mut curr = RbNode::nn_to_mut(node_nnptr);
+
+        if RbNode::is_red(curr.right) {
+            node_nnptr = RbTree::_totate_left(node_nnptr);
+        }
+
+        if RbNode::is_red(curr.right) && !RbNode::is_red(curr.left){
+            curr = RbNode::nn_to_mut(RbTree::_totate_left(unsafe{NonNull::new_unchecked(curr as *mut _)}));
+        }
+
+        if RbNode::is_red(curr.left) && RbNode::is_red(RbNode::nn_to_ref(curr.left.unwrap()).left) {
+            curr = RbNode::nn_to_mut(RbTree::_totate_right(curr.left.unwrap()));
+        }
+
+        if RbNode::is_red(curr.right) && RbNode::is_red(curr.left) {
+            RbTree::_flip_color(unsafe{NonNull::new_unchecked(curr as *mut _)});
+        }
+
+        unsafe{NonNull::new_unchecked(curr as *mut _)}
+
+    }
+
+    fn _delete_min(mut node_nnptr: NonNull<RbNode<K, V>>) -> Option<NonNull<RbNode<K, V>>> {
+        if let None = RbNode::nn_to_ref(node_nnptr).left {
+            return None;
+        }
+
+        if !RbNode::is_red(RbNode::nn_to_ref(node_nnptr).left) && !RbNode::is_red(RbNode::nn_to_ref(RbNode::nn_to_ref(node_nnptr).left.unwrap()).left) {
+            node_nnptr = RbTree::move_red_left(node_nnptr);
+        }
+
+        RbNode::nn_to_mut(node_nnptr).left = RbTree::_delete_min(RbNode::nn_to_mut(node_nnptr).left.unwrap());
+        Some(RbTree::blance(node_nnptr))
+    }
+
+    pub fn delete_min(&mut self) {
+        match self.root {
+            None => {},
+            Some(mut node_nnptr) => {
+                self.root = RbTree::_delete_min(node_nnptr);
+            }
+        }
+    }
+
+    fn _delete(){}
 }
 
 fn main() {
