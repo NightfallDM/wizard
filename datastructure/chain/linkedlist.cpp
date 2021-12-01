@@ -41,15 +41,38 @@ class LinkedList {
         }
 
         void drop(Node<T> *node) {
-            if(!node) {
+            if (!node) {
                 return;
             }
             drop(node->next);
             free(node);
         }
 
+        void reverse() {
+            last = reverse(first);
+            last->next = nullptr;
+        }
+
         ~LinkedList() {
             drop(first);
+        }
+
+        private:
+        Node<T> *reverse(Node<T> *node) {
+            if (!node) {
+                return nullptr;
+            }
+
+            Node<T> *curr = node;
+            Node<T> *after = reverse(node->next);
+            if (!after) {
+                first = curr;
+            }
+
+            if (after) {
+                after->next = curr;
+            }
+            return curr;
         }
 
 };
@@ -58,5 +81,7 @@ int main(void) {
     LinkedList<int> list;
     list.insert_head(100);
     list.insert_head(200);
+    list.traverse();
+    list.reverse();
     list.traverse();
 }
