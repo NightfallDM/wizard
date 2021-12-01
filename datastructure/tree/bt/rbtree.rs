@@ -8,8 +8,8 @@ enum Color {
 }
 
 struct RbNode<K, V> 
-    where K: PartialOrd,
-          V: Display,
+    where K: PartialOrd + Copy,
+          V: Display + Copy,
 {
     key: K,
     value: V,
@@ -19,7 +19,7 @@ struct RbNode<K, V>
     right: Option<NonNull<Self>>,
 }
 
-impl<K: PartialOrd, V: Display> RbNode<K, V> {
+impl<K: PartialOrd + Copy, V: Display + Copy> RbNode<K, V> {
     fn new(key: K, value: V, color: Color) -> Self {
         RbNode {key, value, color, node_count: 0, left: None, right: None}
     }
@@ -51,13 +51,13 @@ impl<K: PartialOrd, V: Display> RbNode<K, V> {
 }
 
 struct RbTree<K, V>
-    where K: PartialOrd,
-          V: Display,
+    where K: PartialOrd + Copy,
+          V: Display + Copy,
 {
     root: Option<NonNull<RbNode<K, V>>>,
 }
 
-impl<K: PartialOrd, V: Display> RbTree<K, V> {
+impl<K: PartialOrd + Copy, V: Display + Copy> RbTree<K, V> {
     pub fn new() -> Self {
         RbTree{root: None}
     }
@@ -158,6 +158,15 @@ impl<K: PartialOrd, V: Display> RbTree<K, V> {
         node_nnptr
     }
 
+    fn move_red_right(mut node_nnptr: NonNull<RbNode<K, V>>) -> NonNull<RbNode<K, V>> {
+        RbTree::flip_color_delete(node_nnptr);
+        if RbNode::is_red(RbNode::nn_to_ref(RbNode::nn_to_ref(node_nnptr).left.unwrap()).left) {
+            node_nnptr = RbTree::_totate_right(node_nnptr);
+            RbNode::nn_to_mut(node_nnptr).right = Some(RbTree::_totate_left(RbNode::nn_to_mut(node_nnptr).right.unwrap()));
+        }
+        node_nnptr
+    }
+
     fn blance(mut node_nnptr: NonNull<RbNode<K, V>>) -> NonNull<RbNode<K, V>>{
         let mut curr = RbNode::nn_to_mut(node_nnptr);
 
@@ -183,6 +192,9 @@ impl<K: PartialOrd, V: Display> RbTree<K, V> {
 
     fn _delete_min(mut node_nnptr: NonNull<RbNode<K, V>>) -> Option<NonNull<RbNode<K, V>>> {
         if let None = RbNode::nn_to_ref(node_nnptr).left {
+            unsafe {
+                Box::from_raw(node_nnptr.as_ptr());
+            }
             return None;
         }
 
@@ -203,7 +215,57 @@ impl<K: PartialOrd, V: Display> RbTree<K, V> {
         }
     }
 
-    fn _delete(){}
+    fn _min(node_nnptr: NonNull<RbNode<K, V>>) -> NonNull<RbNode<K, V>> {
+        let mut tmp_node_nnptr = node_nnptr;
+        while (!RbNode::nn_to_ref(tmp_node_nnptr).left.is_none()) {
+            tmp_node_nnptr = RbNode::nn_to_ref(tmp_node_nnptr).left.unwrap();
+        }
+        tmp_node_nnptr
+    }
+
+    pub fn min(&self) -> Option<NonNull<RbNode<K, V>>> {
+        match self.root {
+            None => None,
+            Some(node_nnptr) => Some(RbTree::_min(node_nnptr)),
+        }
+    }
+
+    fn _delete(mut node_nnptr: NonNull<RbNode<K, V>>, key: K) -> Option<NonNull<RbNode<K, V>>> {
+        if key < RbNode::nn_to_ref(node_nnptr).key {
+            if !RbNode::is_red(RbNode::nn_to_ref(node_nnptr).left) && !RbNode::is_red(RbNode::nn_to_ref(RbNode::nn_to_ref(node_nnptr).left.unwrap()).left) {
+                node_nnptr = RbTree::move_red_left(node_nnptr);
+            }
+            RbNode::nn_to_mut(node_nnptr).left = RbTree::_delete(RbNode::nn_to_mut(node_nnptr).left.unwrap(), key);
+        }else {
+            if RbNode::is_red(RbNode::nn_to_mut(node_nnptr).left) {
+                node_nnptr = RbTree::_totate_right(node_nnptr);
+            }
+
+            if key == RbNode::nn_to_ref(node_nnptr).key && RbNode::nn_to_ref(node_nnptr).right.is_none() {
+                // ret for the 'ahead node call'
+                return None;
+            }
+
+            if !RbNode::is_red(RbNode::nn_to_ref(node_nnptr).right) && !RbNode::is_red(RbNode::nn_to_ref(RbNode::nn_to_ref(node_nnptr).right.unwrap()).left) {
+                node_nnptr = RbTree::move_red_right(node_nnptr);
+            }
+
+            if key == RbNode::nn_to_ref(node_nnptr).key && RbNode::nn_to_ref(node_nnptr).right.is_none() {
+                {
+                    // put in this scope to make sure the min_node_nnptr drop because we will delete it after
+                    // 'drop(min_node_nnptr)' can not do it because NonNull impl 'Copy'
+                    let min_node_nnptr = RbTree::_min(RbNode::nn_to_ref(node_nnptr).right.unwrap());
+                    RbNode::nn_to_mut(node_nnptr).key = RbNode::nn_to_ref(min_node_nnptr).key;
+                    RbNode::nn_to_mut(node_nnptr).value = RbNode::nn_to_ref(min_node_nnptr).value;
+                }
+                RbNode::nn_to_mut(node_nnptr).right = RbTree::_delete_min(RbNode::nn_to_mut(node_nnptr).right.unwrap());
+            }else {
+                RbNode::nn_to_mut(node_nnptr).right = RbTree::_delete(RbNode::nn_to_mut(node_nnptr).right.unwrap(), key);
+            }
+            
+        }
+        Some(RbTree::blance(node_nnptr))
+    }
 }
 
 fn main() {
