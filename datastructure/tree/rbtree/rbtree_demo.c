@@ -40,6 +40,15 @@ int main(void) {
 	for (int i = 0; i < ARRAY_SIZE; i++) {
 		assert(rb_insert(rbt, (void*)kvp_array[i], i) == INSERT_KEY_NOT_EXIST);
 	}
+	
+	assert(rb_delete(rbt, kvp_array[30]) == DEL_KEY_SUCCESS);
+	//assert(rb_delete(rbt, kvp_array[30]) == DEL_KEY_NOT_FIND);
+	assert(rb_delete(rbt, kvp_array[50]) == DEL_KEY_SUCCESS);
+	//assert(rb_delete(rbt, kvp_array[50]) == DEL_KEY_NOT_FIND);
+	assert(rb_delete(rbt, kvp_array[70]) == DEL_KEY_SUCCESS);
+	//assert(rb_delete(rbt, kvp_array[70]) == DEL_KEY_NOT_FIND);
+	assert(rb_delete(rbt, kvp_array[90]) == DEL_KEY_SUCCESS);
+	//assert(rb_delete(rbt, kvp_array[90]) == DEL_KEY_NOT_FIND);
 	rb_show(rbt);
 	rb_destroy(rbt);
 }

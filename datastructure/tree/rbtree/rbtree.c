@@ -142,9 +142,10 @@ static inline rbnode_t* _rb_blance(rbnode_t* rbn) {
 			}
 		}
 	}
+	return rbn;
 }
 
-static rbnode_t* _rb_insert(rbnode_t *rbn, void* key, rbnode_compare cmp, int* jump_blance, insert_state_t *insert_state) {
+static rbnode_t* _rb_insert(rbnode_t *rbn, void* key, rbnode_compare cmp, int* jump_blance, insert_state_t* insert_state) {
 	if (!rbn) {
 		return rb_nd_new(key);
 	}
@@ -161,7 +162,7 @@ static rbnode_t* _rb_insert(rbnode_t *rbn, void* key, rbnode_compare cmp, int* j
 		*jump_blance = 1;
 		return rbn;
 	}
-	if (!jump_blance)
+	if (!*jump_blance)
 		return _rb_blance(rbn);
 	return rbn;
 }
@@ -173,7 +174,114 @@ insert_state_t rb_insert(rbtree_t* rbt, void* key, unsigned long size) {
 	return ret_state;
 }
 
-rbnode_t* rb_get(rbtree_t* rbt, void* key) {}
+static rbnode_t* _rb_get(rbnode_t* rbn, void* key, rbnode_compare cmp) {
+	rbnode_t* tmp_nd = rbn;
+	while (tmp_nd) {
+		int result = cmp(tmp_nd->key, key);
+		if (result < 0) {
+			tmp_nd = tmp_nd->left;
+			continue;
+		}else if (result > 0) {
+			tmp_nd = tmp_nd->right;
+			continue;
+		}else {
+			return tmp_nd;
+		}
+	}
+	return NULL;
+}
 
-delete_state_t rb_delete(rbtree_t* rbt, void* key) {}
+rbnode_t* rb_get(rbtree_t* rbt, void* key) {
+	return _rb_get(rbt->root, key, rbt->cmp);
+}
+
+static rbnode_t* rb_del_min(rbnode_t* rbn, void** keyp, int* jump_blance) {
+	if (!rbn->left) {
+		*keyp = rbn->key;
+		if (rbn->color) {
+			free(rbn);
+			*jump_blance = 1;
+			return NULL;
+		}else {
+			free(rbn);
+			return NULL;
+		}
+	}
+	
+	rbn->left = rb_del_min(rbn->left, keyp, jump_blance);
+	
+	if (rbn->right && !rbn->right->color && !rbn->left)
+		rbn->right->color = RED;
+	if (!*jump_blance)
+		return _rb_blance(rbn);
+	return rbn;
+}
+
+static rbnode_t* _rb_delete(rbnode_t* rbn, void* key, rbnode_compare cmp, rbnode_destructor dest, delete_state_t* del_state, int* jump_blance) {
+/*
+	rbnode_t* tmp_nd = rbn;
+	
+	while (tmp_nd) {
+		int result = cmp(tmp_nd->key, key);
+		if (result < 0) {
+			tmp_nd = tmp_nd->left;
+			continue;
+		}else if (result > 0) {
+			tmp_nd = tmp_nd->right;
+			continue;
+		}else {
+			*del_state = DEL_KEY_SUCCESS;
+			
+			if (tmp_nd)
+		}
+	}
+*/
+	int del_min_jump_blance = 0;
+	rbnode_t* tmp_nd;
+	if (!rbn)
+		return NULL;
+	int result = cmp(rbn->key, key);
+	if (result < 0) {
+		rbn->right = _rb_delete(rbn->right, key, cmp, dest, del_state, jump_blance);
+	}else if (result > 0) {
+		rbn->left = _rb_delete(rbn->left, key, cmp, dest, del_state, jump_blance);
+	}else {
+		*del_state = DEL_KEY_SUCCESS;
+		if (!rbn->right) {
+			if (!rbn->left) {
+				if (rbn->color)
+					*jump_blance = 1;
+				dest(rbn->key);
+				free(rbn);
+				return NULL;
+			}else {
+				*jump_blance = 1;
+				tmp_nd = rbn->left;
+				dest(rbn->key);
+				free(rbn);
+				tmp_nd->color = 0;
+				return tmp_nd;
+			}
+		}else {
+			dest(rbn->key);
+			rbn->key = NULL;
+			rbn->right = rb_del_min(rbn->right, &rbn->key, &del_min_jump_blance);
+			if (del_min_jump_blance)
+				*jump_blance = 1;
+		}
+	}
+
+	if (rbn->right && !rbn->right->color && !rbn->left)
+		rbn->right->color = 1;
+	if (!*jump_blance)
+		return _rb_blance(rbn);
+	return rbn;
+}
+
+delete_state_t rb_delete(rbtree_t* rbt, void* key) {
+	delete_state_t ret_state = DEL_KEY_NOT_FIND;
+	int jump_blance = 0;
+	rbt->root = _rb_delete(rbt->root, key, rbt->cmp, rbt->dest, &ret_state, &jump_blance);
+	return ret_state;
+}
 

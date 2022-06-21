@@ -24,8 +24,8 @@ typedef enum {
 }insert_state_t;
 
 typedef enum {
-	KEY_DEL_SUCCESS,
-	KEY_NOT_FIND,
+	DEL_KEY_SUCCESS,
+	DEL_KEY_NOT_FIND,
 }delete_state_t;
 
 // 0-black
